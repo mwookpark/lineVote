@@ -1,0 +1,23 @@
+{
+  "name": "linevote",
+  "version": "1.0.0",
+  "description": "line voter of lambda",
+  "main": "handler.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mwookpark/lineVote.git"
+  },
+  "author": "park",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mwookpark/lineVote/issues"
+  },
+  "homepage": "https://github.com/mwookpark/lineVote#readme",
+  "dependencies": {
+    "@line/bot-sdk": "^6.2.1",
+    "node-fetch": "^2.2.0"
+  }
+}

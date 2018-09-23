@@ -1,0 +1,16 @@
+{
+  "resource": "/lineVote",
+  "body": {
+    "events": [
+      {
+        "type": "follow",
+        "replyToken": "",
+        "source": {
+          "userId": "",
+          "type": "user"
+        },
+        "timestamp": 1537096072754
+      }
+    ]
+  }
+}
