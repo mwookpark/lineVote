@@ -3,7 +3,7 @@
 const fetch = require("node-fetch");
 const line = require('@line/bot-sdk');
 
-var accessToken = "";
+var accessToken = process.env.ACCESS_TOKEN;
 const client = new line.Client({
     channelAccessToken: accessToken
 });

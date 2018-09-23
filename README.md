@@ -31,15 +31,31 @@ API Gateway
 lineVote
 
 DynamoDB
-lineAccounts
-    
-questionProgress
-userAnswer
-
 
 ■テーブル
+lineAccounts
+    userId
+    displayName
+    isAdmin
+    registrationDate
 
+questionProgress
+    questionNo
+    status
+    updatedDate
 
+userAnswer
+    id
+    userId
+    questionNo
+    answer
+    isCollect
+    registrationDate
+    updatedDate
+
+question
+    questionNo
+    answer
 
 ■確認事項
 ・新規登録時のイベント処理は？
