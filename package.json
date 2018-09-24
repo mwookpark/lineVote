@@ -19,6 +19,7 @@
   "dependencies": {
     "@line/bot-sdk": "^6.2.1",
     "aws-sdk": "^2.320.0",
-    "node-fetch": "^2.2.0"
+    "node-fetch": "^2.2.0",
+    "serverless": "^1.32.0"
   }
 }

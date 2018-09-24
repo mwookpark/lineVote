@@ -69,6 +69,8 @@ question
 ACCESS_TOKEN="" serverless invoke local -f hello -p follow.json
 ACCESS_TOKEN="" serverless invoke local -f hello -p vote.json
 
+■デプロイ
+serverless deploy function -f hello
 
 ■参考
 ユーザIDとアカウント名を取得

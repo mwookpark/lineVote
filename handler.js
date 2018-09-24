@@ -32,19 +32,26 @@ async function getDisplayName(userId){
  *
  * */
 async function replyMessage(replyToken, customMessage){
-    const message = {
+    var message = {
         type: 'text',
         text: customMessage
     };
 
     console.log("replyMessage:" + JSON.stringify(message));
 
-    client.replyMessage(replyToken, message)
+    //var send_result = await client.replyMessage(replyToken, JSON.stringify(message));
+
+    //console.log('send_result:' + send_result);
+
+    //return send_result;
+
+    client.replyMessage(replyToken, JSON.stringify(message))
         .then((response) => {
             console.log("response:" + response);
         })
-        .catch((err) => {
-            console.log("err:" + err);
+        .catch((err, error_description) => {
+            console.log("reply err:" + err);
+            console.log("error_description:" + error_description);
         });
 }
 
@@ -59,14 +66,20 @@ async function insertNewUser(userId, userName){
         }
     };
 
-    DYNAMODB.putItem(params, function (err, res) {
-        if(err){
-            console.log(err, err.stack);
-        }else{
-            console.log(userName + "is inserted");
-            return true;
-        }
-    });
+
+    var put_result = await DYNAMODB.putItem(params).promise();
+
+    console.log(put_result);
+
+    return true;
+    //DYNAMODB.putItem(params, function (err, res) {
+    //    if(err){
+    //        console.log(err, err.stack);
+    //    }else{
+    //        console.log(userName + "is inserted");
+    //        return true;
+    //    }
+    //});
 }
 
 async function getStatus(){
@@ -118,14 +131,16 @@ function getZeroPadding(pNumber){
 }
 
 module.exports.hello = async (event, context, callback) => {
+    console.log(event);
     //for deply
-    //var eventBody = JSON.parse(event.body);
-    var eventBody = event.body;
+    //var eventBody = JSON.parse(event.events[0]);
+    //for local
+    var eventBody = event.events[0];
 
-    var eventType = eventBody.events[0].type;
-    var replyToken = eventBody.events[0].replyToken;
+    var eventType = eventBody.type;
+    var replyToken = eventBody.replyToken;
     console.log("eventType:" + eventType);
-    var userId = eventBody.events[0].source.userId;
+    var userId = eventBody.source.userId;
     console.log("userId:" + userId);
 
     switch(eventType){
@@ -153,7 +168,7 @@ module.exports.hello = async (event, context, callback) => {
                 var notVoteMessage = '問題No.' + questionNo + 'は開始前です。';
                 replyMessage(replyToken, notVoteMessage);
             }else{
-                var answer = eventBody.events[0].message.text;
+                var answer = eventBody.message.text;
 
                 var update_result = await updateUserAnswer(userId, questionNo, answer);
 
