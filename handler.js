@@ -2,6 +2,8 @@
 
 const fetch = require("node-fetch");
 const line = require('@line/bot-sdk');
+const AWS = require('aws-sdk');
+const DYNAMODB = new AWS.DynamoDB({region: 'ap-northeast-1'});
 
 var accessToken = process.env.ACCESS_TOKEN;
 const client = new line.Client({
@@ -46,16 +48,84 @@ async function replyMessage(replyToken, customMessage){
         });
 }
 
-async function insertUser(){
-    console.log("insertUser");
+async function insertNewUser(userId, userName){
+    var params = {
+        TableName: 'lineAccounts',
+        Item: {
+            'userId': {S :userId},
+            'displayName': {S :userName},
+            'isAdmin': {BOOL: false},
+            'registrationDate': {S: getNowDateTime()}
+        }
+    };
+
+    DYNAMODB.putItem(params, function (err, res) {
+        if(err){
+            console.log(err, err.stack);
+        }else{
+            console.log(userName + "is inserted");
+            return true;
+        }
+    });
+}
+
+async function getStatus(){
+    var params = {
+        TableName: 'questionProgress',
+        Key: {
+            "id": {"N": "1"}
+        }
+    };
+
+    var queryItems = await DYNAMODB.getItem(params).promise();
+
+    return queryItems.Item;
+}
+
+async function updateUserAnswer(userId, questionNo, answer){
+    var params = {
+        TableName: 'userAnswer',
+        Item: {
+            'userId-questionNo': {S :userId + '-' + questionNo},
+            'userId': {S :userId},
+            'questionNo': {N: questionNo},
+            'answer': {S :answer},
+            'registrationDate': {S: getNowDateTime()},
+            'updatedDate': {S: getNowDateTime()}
+        }
+    };
+
+    var put_result = await DYNAMODB.putItem(params).promise();
+
+    console.log(put_result);
+
+    return put_result;
+}
+
+
+function getNowDate(){
+    var date = new Date();
+    return date.getFullYear() + '/' +  getZeroPadding(date.getMonth() + 1) + '/' + getZeroPadding(date.getDate());
+}
+
+function getNowDateTime(){
+    var date = new Date();
+    return getNowDate() + ' ' + getZeroPadding(date.getHours()) + getZeroPadding(date.getMinutes()) + getZeroPadding(date.getSeconds());
+}
+
+function getZeroPadding(pNumber){
+    return ('00' + (pNumber)).slice(-2);
 }
 
 module.exports.hello = async (event, context, callback) => {
-    //イベントによる分岐
-    var eventType = event.body.events[0].type;
-    var replyToken = event.body.events[0].replyToken;
+    //for deply
+    //var eventBody = JSON.parse(event.body);
+    var eventBody = event.body;
+
+    var eventType = eventBody.events[0].type;
+    var replyToken = eventBody.events[0].replyToken;
     console.log("eventType:" + eventType);
-    var userId = event.body.events[0].source.userId;
+    var userId = eventBody.events[0].source.userId;
     console.log("userId:" + userId);
 
     switch(eventType){
@@ -66,12 +136,33 @@ module.exports.hello = async (event, context, callback) => {
             console.log("displayName:" + userName);
 
             //DBへ登録を行う
-            console.log("DBへ登録を行う");
-            //案内文を送信する
-            console.log("案内文を送信する");
+            var insert_result = await insertNewUser(userId, userName);
 
-            var welcomeMessage = userName + '様、ようこそ';
-            replyMessage(replyToken, welcomeMessage);
+            //案内文を送信する
+            if(insert_result){
+                var welcomeMessage = userName + '様、ようこそ';
+                replyMessage(replyToken, welcomeMessage);
+            }
+            break;
+        case 'message':
+            //DBから投票可能な状態かを確認
+            var questionStatus = await getStatus();
+            var questionNo = questionStatus.questionNo.N;
+
+            if(questionStatus.status.N == 0){
+                var notVoteMessage = '問題No.' + questionNo + 'は開始前です。';
+                replyMessage(replyToken, notVoteMessage);
+            }else{
+                var answer = eventBody.events[0].message.text;
+
+                var update_result = await updateUserAnswer(userId, questionNo, answer);
+
+                if(update_result){
+                    var votedMessage = '問題No.' + questionNo + 'に' + answer + 'を返答しました。';
+                    replyMessage(replyToken, votedMessage);
+                }
+            }
+
             break;
     }
 };

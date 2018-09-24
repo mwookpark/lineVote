@@ -4,7 +4,7 @@
     "events": [
       {
         "type": "follow",
-        "replyToken": "",
+        "replyToken": "e67507b725ef43208078d644e2f86711",
         "source": {
           "userId": "",
           "type": "user"

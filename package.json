@@ -18,6 +18,7 @@
   "homepage": "https://github.com/mwookpark/lineVote#readme",
   "dependencies": {
     "@line/bot-sdk": "^6.2.1",
+    "aws-sdk": "^2.320.0",
     "node-fetch": "^2.2.0"
   }
 }

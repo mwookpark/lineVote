@@ -1,0 +1,21 @@
+{
+  "resource": "/lineVote",
+  "body": {
+    "events": [
+      {
+        "type": "message",
+        "replyToken": "6d55585ca190426b904008e8931e7246",
+        "source": {
+          "userId": "",
+          "type": "user"
+        },
+        "timestamp": 1537096072754,
+        "message": {
+            "type": "text",
+            "id": "8618917082637",
+            "text": "1"
+        }
+      }
+    ]
+  }
+}

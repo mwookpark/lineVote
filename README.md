@@ -40,12 +40,13 @@ lineAccounts
     registrationDate
 
 questionProgress
+    id
     questionNo
     status
     updatedDate
 
 userAnswer
-    id
+    userId-questionNo
     userId
     questionNo
     answer
@@ -65,7 +66,8 @@ question
 ・nodeのバージョンが変わったせいか、分からないがhttpsでのリクエストの非同期処理がおかしくなっていた。
 
 ■テストスクリプト
-serverless invoke local -f hello -p follow.json
+ACCESS_TOKEN="" serverless invoke local -f hello -p follow.json
+ACCESS_TOKEN="" serverless invoke local -f hello -p vote.json
 
 
 ■参考
