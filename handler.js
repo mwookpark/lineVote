@@ -1,14 +1,11 @@
 'use strict';
 
 const fetch = require("node-fetch");
-const line = require('@line/bot-sdk');
 const AWS = require('aws-sdk');
 const DYNAMODB = new AWS.DynamoDB({region: 'ap-northeast-1'});
+const ASYNC = require('async');
 
 var accessToken = process.env.ACCESS_TOKEN;
-const client = new line.Client({
-    channelAccessToken: accessToken
-});
 
 async function getDisplayName(userId){
     var options = {
@@ -27,32 +24,69 @@ async function getDisplayName(userId){
 }
 
 /**
- * 時間が立ってしまうとreplyはできないので
- * 400が帰ってきたら無視する
  *
- * */
+ **/
 async function replyMessage(replyToken, customMessage){
     var message = {
         type: 'text',
         text: customMessage
     };
 
-    console.log("replyMessage:" + JSON.stringify(message));
+    var body = {
+        "replyToken": replyToken,
+        "messages":[
+            message,
+        ]
+    };
 
-    //var send_result = await client.replyMessage(replyToken, JSON.stringify(message));
+    var opts = {
+        method: "POST",
+        headers: {
+            "Content-type": "application/json; charset=UTF-8",
+            "Authorization": "Bearer " + accessToken,
+        },
+        body: JSON.stringify(body),
+    };
 
-    //console.log('send_result:' + send_result);
+    console.log("replyOptions:" + JSON.stringify(opts));
 
-    //return send_result;
+    var res = await fetch('https://api.line.me/v2/bot/message/reply', opts);
+    var json = await res.json();
 
-    client.replyMessage(replyToken, JSON.stringify(message))
-        .then((response) => {
-            console.log("response:" + response);
-        })
-        .catch((err, error_description) => {
-            console.log("reply err:" + err);
-            console.log("error_description:" + error_description);
-        });
+    console.log("res:" + JSON.stringify(res));
+    return JSON.stringify(res);
+}
+
+
+async function pushMessage(userId, customMessage){
+    var message = {
+        type: 'text',
+        text: customMessage
+    };
+
+    var body = {
+        "to": userId,
+        "messages":[
+            message,
+        ]
+    };
+
+    var opts = {
+        method: "POST",
+        headers: {
+            "Content-type": "application/json; charset=UTF-8",
+            "Authorization": "Bearer " + accessToken,
+        },
+        body: JSON.stringify(body),
+    };
+
+    console.log("pushOptions:" + JSON.stringify(opts));
+
+    var res = await fetch('https://api.line.me/v2/bot/message/push', opts);
+    var json = await res.json();
+
+    console.log("res:" + JSON.stringify(res));
+    return JSON.stringify(res);
 }
 
 async function insertNewUser(userId, userName){
@@ -72,14 +106,6 @@ async function insertNewUser(userId, userName){
     console.log(put_result);
 
     return true;
-    //DYNAMODB.putItem(params, function (err, res) {
-    //    if(err){
-    //        console.log(err, err.stack);
-    //    }else{
-    //        console.log(userName + "is inserted");
-    //        return true;
-    //    }
-    //});
 }
 
 async function getStatus(){
@@ -115,6 +141,60 @@ async function updateUserAnswer(userId, questionNo, answer){
     return put_result;
 }
 
+async function getAllUsers(){
+    var params = {
+        TableName: 'lineAccounts',
+        Select: "ALL_ATTRIBUTES"
+    };
+
+    var scan_result = await DYNAMODB.scan(params).promise();
+
+    console.log(scan_result);
+
+    return scan_result.Items;
+}
+
+async function sendAllUsersMessage(customMessage){
+    var dbUsers = await getAllUsers();
+
+    var users = [];
+
+    dbUsers.forEach(function(item){
+        users.push(item.userId.S);
+    });
+
+    var message = {
+        type: 'text',
+        text: customMessage
+    };
+
+    var body = {
+        "to": users,
+        "messages":[
+            message,
+        ]
+    };
+
+    console.log('body:' + JSON.stringify(body));
+
+    var opts = {
+        method: "POST",
+        headers: {
+            "Content-type": "application/json; charset=UTF-8",
+            "Authorization": "Bearer " + accessToken,
+        },
+        body: JSON.stringify(body),
+    };
+
+    console.log("multicastOptions:" + JSON.stringify(opts));
+
+    var res = await fetch('https://api.line.me/v2/bot/message/multicast', opts);
+    var json = await res.json();
+
+    console.log("res:" + JSON.stringify(res));
+    return JSON.stringify(res);
+}
+
 
 function getNowDate(){
     var date = new Date();
@@ -131,10 +211,30 @@ function getZeroPadding(pNumber){
 }
 
 module.exports.hello = async (event, context, callback) => {
+    //context.callbackWaitsForEmptyEventLoop = false;
     console.log(event);
-    //for deply
-    //var eventBody = JSON.parse(event.events[0]);
-    //for local
+
+    //DynamoDB event
+    if('Records' in event && event.Records.length != 0) {
+        var source = event.Records[0].eventSourceARN;
+
+        if(source.indexOf('/questionProgress/') != -1) {
+            var recordImage = event.Records[0].dynamodb.NewImage;
+
+            var message = '問題No.' + recordImage.questionNo.N + 'を〆ます。';
+
+            if(recordImage.status.N == 1){
+                message = '問題No.' + recordImage.questionNo.N + 'を開始します。';
+            }
+
+            //すべてのユーザへ送信
+            var send_result = await sendAllUsersMessage(message);
+            console.log('send_result:' + send_result);
+        }
+
+        return;
+    }
+
     var eventBody = event.events[0];
 
     var eventType = eventBody.type;
@@ -156,7 +256,10 @@ module.exports.hello = async (event, context, callback) => {
             //案内文を送信する
             if(insert_result){
                 var welcomeMessage = userName + '様、ようこそ';
-                replyMessage(replyToken, welcomeMessage);
+                //replyMessage(replyToken, welcomeMessage);
+                //var send_result = await replyMessage(replyToken, welcomeMessage);
+                var send_result = await pushMessage(userId, welcomeMessage);
+                console.log('send_result:' + send_result);
             }
             break;
         case 'message':
@@ -166,16 +269,33 @@ module.exports.hello = async (event, context, callback) => {
 
             if(questionStatus.status.N == 0){
                 var notVoteMessage = '問題No.' + questionNo + 'は開始前です。';
-                replyMessage(replyToken, notVoteMessage);
+                var send_result = await replyMessage(replyToken, notVoteMessage);
+                console.log('send_result:' + send_result);
             }else{
                 var answer = eventBody.message.text;
 
-                var update_result = await updateUserAnswer(userId, questionNo, answer);
+                //1~3ではなければメッセージを送る
+                if(answer == '1' || answer == '2' || answer == '3' ){
+                    var update_result = await updateUserAnswer(userId, questionNo, answer);
 
-                if(update_result){
-                    var votedMessage = '問題No.' + questionNo + 'に' + answer + 'を返答しました。';
-                    replyMessage(replyToken, votedMessage);
+                    if(update_result){
+                        var votedMessage = '問題No.' + questionNo + 'に' + answer + 'を返答しました。';
+                        var send_result = await replyMessage(replyToken, votedMessage);
+                        console.log('send_result:' + send_result);
+                    }
+
+                    return;
                 }
+
+                //user名を取得
+                var userName = await getDisplayName(userId);
+
+                var message = userName + '様が'+answer+'しました。';
+                console.log(message);
+
+                //すべてのユーザへ送信
+                var send_result = await sendAllUsersMessage(message);
+                console.log('send_result:' + send_result);
             }
 
             break;

@@ -1,0 +1,19 @@
+{ Records:
+    [ { eventID: '87da767712133122856cbacf304d4687',
+    eventName: 'MODIFY',
+    eventVersion: '1.1',
+    eventSource: 'aws:dynamodb',
+    awsRegion: 'ap-northeast-1',
+    dynamodb: { Items:
+        [ { registrationDate: [Object],
+        displayName: [Object],
+        isAdmin: [Object],
+        userId: "S": "2" },
+    { registrationDate: [Object],
+    displayName: [Object],
+    isAdmin: [Object],
+    userId: "S": "1" } ],
+    Count: 2,
+    ScannedCount: 2 },
+    eventSourceARN: 'arn:aws:dynamodb:ap-northeast-1:545253934258:table/questionProgress/stream/2018-09-30T04:43:42.718' } ]
+}
