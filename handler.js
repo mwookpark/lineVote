@@ -121,6 +121,19 @@ async function getStatus(){
     return queryItems.Item;
 }
 
+async function getImageURL(questionNo){
+    var params = {
+        TableName: 'question',
+        Key: {
+            "questionNo": {"N": questionNo}
+        }
+    };
+
+    var queryItems = await DYNAMODB.getItem(params).promise();
+
+    return queryItems.Item.image.S;
+}
+
 async function updateUserAnswer(userId, questionNo, answer){
     var params = {
         TableName: 'userAnswer',
@@ -154,7 +167,7 @@ async function getAllUsers(){
     return scan_result.Items;
 }
 
-async function sendAllUsersMessage(customMessage){
+async function sendAllUsersMessage(customMessage, questionNo){
     var dbUsers = await getAllUsers();
 
     var users = [];
@@ -191,8 +204,39 @@ async function sendAllUsersMessage(customMessage){
     var res = await fetch('https://api.line.me/v2/bot/message/multicast', opts);
     var json = await res.json();
 
-    console.log("res:" + JSON.stringify(res));
-    return JSON.stringify(res);
+    //画像も送る
+    if(questionNo > 0){
+        var imageURL = await getImageURL(questionNo);
+
+        message = {
+            type: 'image',
+            originalContentUrl: imageURL,
+            previewImageUrl: imageURL,
+        };
+
+        body = {
+            "to": users,
+            "messages":[
+                message,
+            ]
+        };
+
+        opts = {
+            method: "POST",
+            headers: {
+                "Content-type": "application/json; charset=UTF-8",
+                "Authorization": "Bearer " + accessToken,
+            },
+            body: JSON.stringify(body),
+        };
+
+        console.log("multicastOptions:" + JSON.stringify(opts));
+
+        res = await fetch('https://api.line.me/v2/bot/message/multicast', opts);
+        json = await res.json();
+    }
+
+    return true;
 }
 
 
@@ -222,13 +266,15 @@ module.exports.hello = async (event, context, callback) => {
             var recordImage = event.Records[0].dynamodb.NewImage;
 
             var message = '問題No.' + recordImage.questionNo.N + 'を〆ます。';
+            var questionNo = 0;
 
             if(recordImage.status.N == 1){
                 message = '問題No.' + recordImage.questionNo.N + 'を開始します。';
+                questionNo = recordImage.questionNo.N;
             }
 
             //すべてのユーザへ送信
-            var send_result = await sendAllUsersMessage(message);
+            var send_result = await sendAllUsersMessage(message, questionNo);
             console.log('send_result:' + send_result);
         }
 
@@ -294,7 +340,7 @@ module.exports.hello = async (event, context, callback) => {
                 console.log(message);
 
                 //すべてのユーザへ送信
-                var send_result = await sendAllUsersMessage(message);
+                var send_result = await sendAllUsersMessage(message, 0);
                 console.log('send_result:' + send_result);
             }
 
