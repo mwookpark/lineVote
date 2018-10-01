@@ -121,6 +121,35 @@ async function getStatus(){
     return queryItems.Item;
 }
 
+async function updateState(questionNo, questionStatus, answer){
+    if(answer == 's'){
+        questionStatus = '1';
+        questionNo = parseInt(questionNo) + 1;
+        questionNo = questionNo + '';
+    }else if(answer == 'reset'){
+        questionStatus = '1';
+        questionNo = '1';
+    }else{
+        questionStatus = '0';
+    }
+
+    var params = {
+        TableName: 'questionProgress',
+        Item: {
+            'id': {"N": "1"},
+            'questionNo': {N: questionNo},
+            'status': {N: questionStatus},
+            'updatedDate': {S: getNowDateTime()}
+        }
+    };
+
+    var put_result = await DYNAMODB.putItem(params).promise();
+
+    console.log(put_result);
+
+    return put_result;
+}
+
 async function getImageURL(questionNo){
     var params = {
         TableName: 'question',
@@ -312,29 +341,35 @@ module.exports.hello = async (event, context, callback) => {
             //DBから投票可能な状態かを確認
             var questionStatus = await getStatus();
             var questionNo = questionStatus.questionNo.N;
+            var answer = eventBody.message.text;
+
+            //user名を取得
+            var userName = await getDisplayName(userId);
+console.log('userName:' + userName);
+console.log('answer:' + answer);
+
+            if((userName == 'min' || userName == 'あすみ') && (answer == 'e' || answer =='s' || answer == 'reset')){
+                var send_result = await updateState(questionNo, questionStatus, answer);
+                return;
+            }
 
             if(questionStatus.status.N == 0){
-                var notVoteMessage = '問題No.' + questionNo + 'は開始前です。';
+                var notVoteMessage = userName + 'よ、問題No.' + questionNo + 'は開始前である。';
                 var send_result = await replyMessage(replyToken, notVoteMessage);
                 console.log('send_result:' + send_result);
             }else{
-                var answer = eventBody.message.text;
-
                 //1~3ではなければメッセージを送る
                 if(answer == '1' || answer == '2' || answer == '3' ){
                     var update_result = await updateUserAnswer(userId, questionNo, answer);
 
                     if(update_result){
-                        var votedMessage = '問題No.' + questionNo + 'に' + answer + 'を返答しました。';
+                        var votedMessage = userName + 'は問題No.' + questionNo + 'に' + answer + 'と返答した。';
                         var send_result = await replyMessage(replyToken, votedMessage);
                         console.log('send_result:' + send_result);
                     }
 
                     return;
                 }
-
-                //user名を取得
-                var userName = await getDisplayName(userId);
 
                 var message = userName + '様が'+answer+'しました。';
                 console.log(message);
