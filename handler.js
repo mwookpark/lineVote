@@ -7,6 +7,11 @@ const ASYNC = require('async');
 
 var accessToken = process.env.ACCESS_TOKEN;
 
+/**
+ * userIdよりdisplayNameを取得する
+ *
+ * @param {string} userId
+ **/
 async function getDisplayName(userId){
     var options = {
             hostname: 'api.line.me',
@@ -24,7 +29,10 @@ async function getDisplayName(userId){
 }
 
 /**
+ * replyTokenにより返信をする
  *
+ * @param {string} replyToken
+ * @param {string} customMessage
  **/
 async function replyMessage(replyToken, customMessage){
     var message = {
@@ -57,7 +65,12 @@ async function replyMessage(replyToken, customMessage){
     return JSON.stringify(res);
 }
 
-
+/**
+ * userIdにメッセージを送る
+ *
+ * @param {string} userId
+ * @param {string} customMessage
+ **/
 async function pushMessage(userId, customMessage){
     var message = {
         type: 'text',
@@ -89,6 +102,12 @@ async function pushMessage(userId, customMessage){
     return JSON.stringify(res);
 }
 
+/**
+ * 新規ユーザをlineAccountsテーブルに登録する
+ *
+ * @param {string} userId
+ * @param {string} userName
+ **/
 async function insertNewUser(userId, userName){
     var params = {
         TableName: 'lineAccounts',
@@ -108,6 +127,10 @@ async function insertNewUser(userId, userName){
     return true;
 }
 
+/**
+ * 問題の開始・〆状況を確認する
+ *
+ **/
 async function getStatus(){
     var params = {
         TableName: 'questionProgress',
@@ -121,6 +144,13 @@ async function getStatus(){
     return queryItems.Item;
 }
 
+/**
+ * 問題の状態を開始または〆に更新する
+ *
+ * @param {int} questionNo
+ * @param {int} questionStatus
+ * @param {string} answer
+ **/
 async function updateState(questionNo, questionStatus, answer){
     if(answer == 's'){
         questionStatus = '1';
@@ -150,6 +180,11 @@ async function updateState(questionNo, questionStatus, answer){
     return put_result;
 }
 
+/**
+ * 問題の画像を取得する
+ *
+ * @param {int} questionNo
+ **/
 async function getImageURL(questionNo){
     var params = {
         TableName: 'question',
@@ -163,6 +198,13 @@ async function getImageURL(questionNo){
     return queryItems.Item.image.S;
 }
 
+/**
+ * 問題に対するユーザの回答を更新する
+ *
+ * @param {string} userId
+ * @param {int} questionNo
+ * @param {string} answer
+ **/
 async function updateUserAnswer(userId, questionNo, answer){
     var params = {
         TableName: 'userAnswer',
@@ -183,6 +225,9 @@ async function updateUserAnswer(userId, questionNo, answer){
     return put_result;
 }
 
+/**
+ * 全体配信の為、登録されている全てのユーザを取得する
+ **/
 async function getAllUsers(){
     var params = {
         TableName: 'lineAccounts',
@@ -196,6 +241,13 @@ async function getAllUsers(){
     return scan_result.Items;
 }
 
+/**
+ * 全てのユーザに問題と画像の配信を行う
+ * 問題番号がない場合はメッセージのみ配信する
+ *
+ * @param {string} customMessage
+ * @param {int} questionNo
+ **/
 async function sendAllUsersMessage(customMessage, questionNo){
     var dbUsers = await getAllUsers();
 
@@ -216,8 +268,6 @@ async function sendAllUsersMessage(customMessage, questionNo){
             message,
         ]
     };
-
-    console.log('body:' + JSON.stringify(body));
 
     var opts = {
         method: "POST",
@@ -268,23 +318,36 @@ async function sendAllUsersMessage(customMessage, questionNo){
     return true;
 }
 
-
+/**
+ * YYYY/MM/DDフォーマットの現在日を取得する
+ *
+ * @return  {string}
+ **/
 function getNowDate(){
     var date = new Date();
     return date.getFullYear() + '/' +  getZeroPadding(date.getMonth() + 1) + '/' + getZeroPadding(date.getDate());
 }
 
+/**
+ * YYYY/MM/DD HH/MM/SSフォーマットの現在日時を取得する
+ *
+ * @return  {string}
+ **/
 function getNowDateTime(){
     var date = new Date();
     return getNowDate() + ' ' + getZeroPadding(date.getHours()) + getZeroPadding(date.getMinutes()) + getZeroPadding(date.getSeconds());
 }
 
+/**
+ * 日付・時間を00paddingする
+ *
+ * @return  {string}
+ **/
 function getZeroPadding(pNumber){
     return ('00' + (pNumber)).slice(-2);
 }
 
 module.exports.hello = async (event, context, callback) => {
-    //context.callbackWaitsForEmptyEventLoop = false;
     console.log(event);
 
     //DynamoDB event
@@ -331,8 +394,6 @@ module.exports.hello = async (event, context, callback) => {
             //案内文を送信する
             if(insert_result){
                 var welcomeMessage = userName + '様、ようこそ';
-                //replyMessage(replyToken, welcomeMessage);
-                //var send_result = await replyMessage(replyToken, welcomeMessage);
                 var send_result = await pushMessage(userId, welcomeMessage);
                 console.log('send_result:' + send_result);
             }
@@ -345,10 +406,9 @@ module.exports.hello = async (event, context, callback) => {
 
             //user名を取得
             var userName = await getDisplayName(userId);
-console.log('userName:' + userName);
-console.log('answer:' + answer);
 
-            if((userName == 'min' || userName == 'あすみ') && (answer == 'e' || answer =='s' || answer == 'reset')){
+            //管理者モード
+            if((userName == 'min' && (answer == 'e' || answer =='s' || answer == 'reset')){
                 var send_result = await updateState(questionNo, questionStatus, answer);
                 return;
             }
@@ -356,6 +416,29 @@ console.log('answer:' + answer);
             if(questionStatus.status.N == 0){
                 var notVoteMessage = userName + 'よ、問題No.' + questionNo + 'は開始前である。';
                 var send_result = await replyMessage(replyToken, notVoteMessage);
+                console.log('send_result:' + send_result);
+
+                if(answer == undefined){
+                    answer = 'いやらしいことを';
+                }
+
+                if(answer == '1'){
+                    answer = 'いかかわしいことを';
+                }
+
+                if(answer == '2'){
+                    answer = 'えっちなことを';
+                }
+
+                if(answer == '3'){
+                    answer = 'omosiroiなことを';
+                }
+
+                var message = userName + '様が'+answer+'しました。';
+                console.log(message);
+
+                //すべてのユーザへ送信
+                var send_result = await sendAllUsersMessage(message, 0);
                 console.log('send_result:' + send_result);
             }else{
                 //1~3ではなければメッセージを送る
@@ -370,13 +453,6 @@ console.log('answer:' + answer);
 
                     return;
                 }
-
-                var message = userName + '様が'+answer+'しました。';
-                console.log(message);
-
-                //すべてのユーザへ送信
-                var send_result = await sendAllUsersMessage(message, 0);
-                console.log('send_result:' + send_result);
             }
 
             break;
